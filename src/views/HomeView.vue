@@ -190,20 +190,15 @@ const baseData = {
 //     ],
 //   },
 // ]
-
 const characters: Ref<Character[]> = ref([])
 const currentCharacterId: Ref<Character['id']> = ref(0)
 const showAddCharacterModal = ref(false)
-const showSaveIndicator = ref(false)
 const newCharacter = ref({
   name: '',
   commanderLevel: 1,
   targetCostPerformance: 0.8,
 })
-// const newCharacterName = ref('')
-// const newCommanderLevel = ref(1)
-// const newTargetCostPerformance = ref(0.78)
-// const costChart = ref(null)
+
 const levelOptions = [
   {
     label: '陨石',
@@ -266,9 +261,13 @@ const currentCharacter = computed(() => {
   )
 })
 // 保存角色数据
-const saveCharacterData = () => {
+const saveCharacterData = async () => {
   // 在实际应用中，这里可以发送数据到服务器或保存到本地存储
-  db.
+  // db.
+  // const res = await db.character.add(newCharacter)
+  // console.log('🚀 ~ saveCharacterData ~ res:', res)
+  // const newData = await _db.character.toArray()
+  // console.log('🚀 ~ saveCharacterData ~ newCharacter:', newData)
   // showSaveIndicator.value = true
   // setTimeout(() => {
   //   showSaveIndicator.value = false
@@ -313,7 +312,7 @@ const getHeroEquipmentCost = (level: string) => {
   return item ? item.cost : 0
 }
 // 保存新角色
-const saveNewCharacter = () => {
+const saveNewCharacter = async () => {
   if (!newCharacter.value.name.trim()) {
     ElMessageBox.alert('请输入角色名称')
     return
@@ -344,6 +343,7 @@ const saveNewCharacter = () => {
 
   characters.value.push(_newCharacter)
   currentCharacterId.value = _newCharacter.id
+  await db.character.add(_newCharacter)
 
   // 重置表单并关闭模态框
 
@@ -352,6 +352,7 @@ const saveNewCharacter = () => {
     commanderLevel: 1,
     targetCostPerformance: 0.8,
   }
+  console.log('🚀 ~ saveNewCharacter ~ newCharacter:', newCharacter)
   showAddCharacterModal.value = false
 }
 
