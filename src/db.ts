@@ -17,3 +17,4 @@ db.version(1).stores({
 })
 
 // export const character = db.table('character')
+

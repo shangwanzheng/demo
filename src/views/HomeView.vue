@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, type Ref } from 'vue'
+import { computed, onMounted, ref, toRaw, type Ref } from 'vue'
 import type { Character } from './type'
-import { ElDialog, ElMessageBox } from 'element-plus'
+import { ElDialog, ElMessageBox, ElTabs, ElTabPane } from 'element-plus'
 import { db } from '@/db'
-
+import { useObservable } from '@vueuse/rxjs'
+import { liveQuery } from 'dexie'
 // 基础数据
 const baseData = {
   lordEquipment: [
@@ -190,8 +191,11 @@ const baseData = {
 //     ],
 //   },
 // ]
-const characters: Ref<Character[]> = ref([])
-const currentCharacterId: Ref<Character['id']> = ref(0)
+const characters = useObservable<Character[]>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  liveQuery(async () => await db.character.toArray()) as any,
+)
+const currentCharacterId: Ref<Character['id']> = ref(characters?.value?.[0]?.id || 0)
 const showAddCharacterModal = ref(false)
 const newCharacter = ref({
   name: '',
@@ -243,8 +247,11 @@ const fireCrystalProgressOptions = [
 ]
 // 计算当前选中的角色
 const currentCharacter = computed(() => {
+  console.log(characters.value)
   return (
-    characters.value.find((char) => char.id === currentCharacterId.value) || {
+    characters.value?.find((char) => char.id === currentCharacterId.value) ||
+    ({
+      id: -1,
       commanderLevel: 0,
       shieldLife: 0,
       arrowPenetration: 0,
@@ -257,26 +264,28 @@ const currentCharacter = computed(() => {
       name: '',
       lordEquipment: [],
       heroEquipment: [],
-    }
+    } as Character)
   )
 })
 // 保存角色数据
 const saveCharacterData = async () => {
   // 在实际应用中，这里可以发送数据到服务器或保存到本地存储
   // db.
+
   // const res = await db.character.add(newCharacter)
-  // console.log('🚀 ~ saveCharacterData ~ res:', res)
-  // const newData = await _db.character.toArray()
-  // console.log('🚀 ~ saveCharacterData ~ newCharacter:', newData)
-  // showSaveIndicator.value = true
-  // setTimeout(() => {
-  //   showSaveIndicator.value = false
-  // }, 2000)
+  // console.log('🚀 ~ saveCharacterData ~ res:', currentCharacter)
+  await db.character
+    .where('id')
+    .equals(currentCharacterId.value)
+    .modify({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(toRaw(currentCharacter.value) as any),
+    })
 }
 
 // 删除当前角色
 const deleteCurrentCharacter = () => {
-  if (characters.value.length <= 1) {
+  if (characters.value && characters.value.length <= 1) {
     alert('至少需要保留一个角色')
     return
   }
@@ -284,10 +293,13 @@ const deleteCurrentCharacter = () => {
   if (!confirm(`确定要删除角色 "${currentCharacter.value.name}" 吗？此操作无法撤销。`)) {
     return
   }
+  db.character.delete(currentCharacterId.value)
 
-  const index = characters.value.findIndex((char) => char.id === currentCharacterId.value)
-  characters.value.splice(index, 1)
-  currentCharacterId.value = characters?.value[0]?.id || 0
+  // const index = characters.value?.findIndex((char) => char.id === currentCharacterId.value) || -1
+  // if (index > -1) {
+  //   characters.value?.splice(index, 1)
+  //   currentCharacterId.value = characters?.value?.[0]?.id || 0
+  // }
 }
 // 初始化图表
 onMounted(() => {})
@@ -319,7 +331,7 @@ const saveNewCharacter = async () => {
   }
 
   // 检查角色名称是否已存在
-  if (characters.value.some((char) => char.name === newCharacter.value.name)) {
+  if (characters.value?.some((char) => char.name === newCharacter.value.name)) {
     ElMessageBox.alert('角色名称已存在，请使用不同的名称')
     return
   }
@@ -341,7 +353,7 @@ const saveNewCharacter = async () => {
     heroEquipment: [],
   }
 
-  characters.value.push(_newCharacter)
+  characters.value?.push(_newCharacter)
   currentCharacterId.value = _newCharacter.id
   await db.character.add(_newCharacter)
 
@@ -362,6 +374,46 @@ const saveNewCharacter = async () => {
 //   return item ? item.cost : 0
 // }
 
+const getTicketCost = (ticketCount: number) => {
+  if (!ticketCount || typeof ticketCount !== 'number' || ticketCount < 5) {
+    return 5738
+  }
+  if (ticketCount === 5 || ticketCount < 10) {
+    return 5090
+  }
+  if (ticketCount === 10 || ticketCount < 15) {
+    return 4442
+  }
+  if (ticketCount === 15 || ticketCount < 20) {
+    return 3794
+  }
+  if (ticketCount === 20 || ticketCount < 25) {
+    return 3146
+  }
+  if (ticketCount === 25 || ticketCount < 30) {
+    return 2498
+  }
+  if (ticketCount === 30 || ticketCount < 35) {
+    return 1850
+  }
+  if (ticketCount === 35 || ticketCount < 40) {
+    return 1202
+  }
+  if (ticketCount === 40 || ticketCount < 44) {
+    return 554
+  }
+  if (ticketCount === 44 || ticketCount < 47) {
+    return 226
+  }
+  if (ticketCount === 47 || ticketCount < 49) {
+    return 98
+  }
+  if (ticketCount === 49 || ticketCount < 50) {
+    return 30
+  }
+  return 0
+}
+
 // 计算各项成本
 const costs = computed(() => {
   // 计算领主装备总成本
@@ -381,7 +433,7 @@ const costs = computed(() => {
   })
 
   // 计算机票成本（简化计算）
-  const ticketCost = currentCharacter.value.ticketCount * 100
+  const ticketCost = getTicketCost(currentCharacter.value.ticketCount)
 
   // 计算合计成本（根据Excel公式）
   const t11UnitValue = 2000
@@ -418,7 +470,44 @@ const costs = computed(() => {
     priceReduction: priceReduction,
   }
 })
-
+// 添加领主装备
+const addLordEquipment = () => {
+  if (currentCharacter.value.id === -1) {
+    ElMessageBox.alert('请选择角色')
+    return
+  }
+  // if ()
+  currentCharacter.value.lordEquipment.push({
+    level: '神话T2',
+    gem1: 11,
+    gem2: 11,
+    gem3: 11,
+  })
+}
+const addHeroEquipment = () => {
+  if (currentCharacter.value.id === -1) {
+    ElMessageBox.alert('请选择角色')
+    return
+  }
+  currentCharacter.value.heroEquipment.push({
+    level: '红100',
+    mastery: 20,
+  })
+}
+// 删除英雄装备
+const removeHeroEquipment = (index: number) => {
+  currentCharacter.value.heroEquipment.splice(index, 1)
+}
+// 删除领主装备
+const removeLordEquipment = (index: number) => {
+  currentCharacter.value.lordEquipment.splice(index, 1)
+}
+// 获取专精成本
+const getMasteryCost = (level: number) => {
+  const item = baseData.mastery.find((item) => item.level === level)
+  return item ? item.cost : 0
+}
+const activeTab = ref('result')
 // 监听成本变化，更新图表
 // watch(
 //   costs,
@@ -583,7 +672,7 @@ const costs = computed(() => {
             <button
               class="btn btn-outline-danger"
               @click="deleteCurrentCharacter"
-              :disabled="characters.length <= 1"
+              :disabled="!characters || characters.length <= 1"
             >
               <i class="fas fa-trash me-1"></i>删除当前角色
             </button>
@@ -597,72 +686,235 @@ const costs = computed(() => {
       <div class="card">
         <div class="card-header"><i class="fas fa-calculator me-2"></i>成本与计算结果</div>
         <div class="card-body">
-          <div class="row">
-            <div class="col-md-3">
-              <div class="result-box">
-                <h6>领主装备成本</h6>
-                <h4>{{ costs.lordEquipment.toFixed(2) }}</h4>
+          <el-tabs class="demo-tabs" v-model="activeTab">
+            <el-tab-pane label="计算结果" name="result">
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="result-box">
+                    <h6>领主装备成本</h6>
+                    <h4>{{ costs.lordEquipment.toFixed(2) }}</h4>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="result-box">
+                    <h6>宝石成本</h6>
+                    <h4>{{ costs.gem.toFixed(2) }}</h4>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="result-box">
+                    <h6>英雄装备成本</h6>
+                    <h4>{{ costs.heroEquipment.toFixed(2) }}</h4>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="result-box">
+                    <h6>机票成本</h6>
+                    <h4>{{ costs.ticket.toFixed(2) }}</h4>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="col-md-3">
-              <div class="result-box">
-                <h6>宝石成本</h6>
-                <h4>{{ costs.gem.toFixed(2) }}</h4>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="result-box">
-                <h6>英雄装备成本</h6>
-                <h4>{{ costs.heroEquipment.toFixed(2) }}</h4>
-              </div>
-            </div>
-            <div class="col-md-3">
-              <div class="result-box">
-                <h6>机票成本</h6>
-                <h4>{{ costs.ticket.toFixed(2) }}</h4>
-              </div>
-            </div>
-          </div>
 
-          <div class="row mt-3">
-            <div class="col-md-4">
-              <div class="highlight">
-                <h6>合计成本</h6>
-                <h4>{{ costs.total.toFixed(2) }}</h4>
+              <div class="row mt-3">
+                <div class="col-md-4">
+                  <div class="highlight">
+                    <h6>合计成本</h6>
+                    <h4>{{ costs.total.toFixed(2) }}</h4>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="highlight">
+                    <h6>总成本</h6>
+                    <h4>{{ costs.overall.toFixed(2) }}</h4>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="highlight">
+                    <h6>性价比</h6>
+                    <h4>{{ costs.performance.toFixed(4) }}</h4>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="col-md-4">
-              <div class="highlight">
-                <h6>总成本</h6>
-                <h4>{{ costs.overall.toFixed(2) }}</h4>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="highlight">
-                <h6>性价比</h6>
-                <h4>{{ costs.performance.toFixed(4) }}</h4>
-              </div>
-            </div>
-          </div>
 
-          <div class="row mt-3">
-            <div class="col-md-6">
-              <div class="highlight">
-                <h6>目标性价比价格</h6>
-                <h4>{{ costs.targetPrice.toFixed(2) }}</h4>
+              <div class="row mt-3">
+                <div class="col-md-6">
+                  <div class="highlight">
+                    <h6>目标性价比价格</h6>
+                    <h4>{{ costs.targetPrice.toFixed(2) }}</h4>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="highlight">
+                    <h6>需要砍价金额</h6>
+                    <h4>{{ costs.priceReduction.toFixed(2) }}</h4>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="col-md-6">
-              <div class="highlight">
-                <h6>需要砍价金额</h6>
-                <h4>{{ costs.priceReduction.toFixed(2) }}</h4>
-              </div>
-            </div>
-          </div>
 
-          <div class="chart-container mt-4">
-            <canvas ref="costChart"></canvas>
-          </div>
+              <!-- <div class="chart-container mt-4">
+                <canvas ref="costChart"></canvas>
+              </div> -->
+            </el-tab-pane>
+            <el-tab-pane label="领主装备设置" name="lordEquipment">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="section-title"></h5>
+                <button
+                  class="btn btn-primary btn-sm"
+                  :disabled="currentCharacter.lordEquipment.length > 5"
+                  @click="addLordEquipment"
+                >
+                  <i class="fas fa-plus me-1"></i>添加装备
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                  <thead>
+                    <tr>
+                      <th>装备等级</th>
+                      <th>1号宝石</th>
+                      <th>2号宝石</th>
+                      <th>3号宝石</th>
+                      <th>装备成本</th>
+                      <th>宝石成本</th>
+                      <th>合计</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(item, index) in currentCharacter.lordEquipment"
+                      :key="index"
+                      class="equipment-row"
+                    >
+                      <td>
+                        <select class="form-select form-select-sm" v-model="item.level">
+                          <option
+                            v-for="lord in baseData.lordEquipment"
+                            :key="lord.level"
+                            :value="lord.level"
+                          >
+                            {{ lord.level }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm" v-model="item.gem1">
+                          <option v-for="gem in baseData.gems" :key="gem.level" :value="gem.level">
+                            {{ gem.level }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm" v-model="item.gem2">
+                          <option v-for="gem in baseData.gems" :key="gem.level" :value="gem.level">
+                            {{ gem.level }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm" v-model="item.gem3">
+                          <option v-for="gem in baseData.gems" :key="gem.level" :value="gem.level">
+                            {{ gem.level }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        {{ getLordEquipmentCost(item.level).toFixed(2) }}
+                      </td>
+                      <td>
+                        {{ getGemCost([item.gem1, item.gem2, item.gem3]).toFixed(2) }}
+                      </td>
+                      <td>
+                        {{
+                          (
+                            getLordEquipmentCost(item.level) +
+                            getGemCost([item.gem1, item.gem2, item.gem3])
+                          ).toFixed(2)
+                        }}
+                      </td>
+                      <td>
+                        <button class="btn btn-danger btn-sm" @click="removeLordEquipment(index)">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane label="英雄装备设置" name="heroEquipment">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="section-title"></h5>
+                <button class="btn btn-primary btn-sm" @click="addHeroEquipment">
+                  <i class="fas fa-plus me-1"></i>添加装备
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                  <thead>
+                    <tr>
+                      <th>装备等级</th>
+                      <th>专精等级</th>
+                      <th>装备成本</th>
+                      <th>专精成本</th>
+                      <th>合计</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(item, index) in currentCharacter.heroEquipment"
+                      :key="index"
+                      class="equipment-row"
+                    >
+                      <td>
+                        <select class="form-select form-select-sm" v-model="item.level">
+                          <option
+                            v-for="hero in baseData.heroEquipment"
+                            :key="hero.level"
+                            :value="hero.level"
+                          >
+                            {{ hero.level }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm" v-model.number="item.mastery">
+                          <option
+                            v-for="mastery in baseData.mastery"
+                            :key="mastery.level"
+                            :value="mastery.level"
+                          >
+                            {{ mastery.level }}
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        {{ getHeroEquipmentCost(item.level).toFixed(2) }}
+                      </td>
+                      <td>
+                        {{ getMasteryCost(item.mastery).toFixed(2) }}
+                      </td>
+                      <td>
+                        {{
+                          (getHeroEquipmentCost(item.level) + getMasteryCost(item.mastery)).toFixed(
+                            2,
+                          )
+                        }}
+                      </td>
+                      <td>
+                        <button class="btn btn-danger btn-sm" @click="removeHeroEquipment(index)">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </el-tab-pane>
+            <!-- <el-tab-pane label="Role" name="third">Role</el-tab-pane> -->
+            <!-- <el-tab-pane label="Task" name="fourth">Task</el-tab-pane> -->
+          </el-tabs>
         </div>
       </div>
     </div>
