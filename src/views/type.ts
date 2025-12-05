@@ -12,6 +12,7 @@ export interface Character {
   targetCostPerformance: number
   lordEquipment: LordEquipment[]
   heroEquipment: HeroEquipment[]
+  costs?: Costs
 }
 
 interface LordEquipment {
@@ -24,4 +25,16 @@ interface LordEquipment {
 interface HeroEquipment {
   level: string
   mastery: number
+}
+
+interface Costs {
+  lordEquipment: number
+  gem: number
+  heroEquipment: number
+  ticket: number
+  total: number
+  overall: number
+  performance: number
+  targetPrice: number
+  periceReduction: number
 }

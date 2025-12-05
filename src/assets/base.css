@@ -167,3 +167,14 @@ body {
 .save-indicator.show {
   opacity: 1;
 }
+
+.el-select {
+  flex: 1;
+}
+.add-btn {
+  padding: 3px 16px;
+  /* font-size: x-small; */
+}
+.el-select__wrapper {
+  border-radius: 0;
+}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRaw, type Ref } from 'vue'
 import type { Character } from './type'
-import { ElDialog, ElMessageBox, ElTabs, ElTabPane } from 'element-plus'
+import { ElDialog, ElMessageBox, ElTabs, ElTabPane, ElSelect, ElOption } from 'element-plus'
 import { db } from '@/db'
 import { useObservable } from '@vueuse/rxjs'
 import { liveQuery } from 'dexie'
@@ -274,12 +274,16 @@ const saveCharacterData = async () => {
 
   // const res = await db.character.add(newCharacter)
   // console.log('🚀 ~ saveCharacterData ~ res:', currentCharacter)
+  const data = {
+    ...toRaw(currentCharacter.value),
+    costs,
+  }
   await db.character
     .where('id')
     .equals(currentCharacterId.value)
     .modify({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(toRaw(currentCharacter.value) as any),
+      ...(data as any),
     })
 }
 
@@ -537,12 +541,24 @@ const activeTab = ref('result')
           <div class="mb-3">
             <label for="characterSelect" class="form-label">选择角色</label>
             <div class="input-group">
-              <select class="form-select" id="characterSelect" v-model="currentCharacterId">
+              <el-select v-model="currentCharacterId" filterable placeholder="Select">
+                <el-option
+                  v-for="item in characters"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+              <!-- <select class="form-select" id="characterSelect" v-model="currentCharacterId">
                 <option v-for="character in characters" :key="character.id" :value="character.id">
                   {{ character.name }}
                 </option>
-              </select>
-              <button class="btn btn-success" type="button" @click="showAddCharacterModal = true">
+              </select> -->
+              <button
+                class="btn btn-primary add-btn"
+                type="button"
+                @click="showAddCharacterModal = true"
+              >
                 <i class="fas fa-plus me-1"></i>添加
               </button>
             </div>
@@ -550,15 +566,21 @@ const activeTab = ref('result')
 
           <div class="mb-3">
             <label class="form-label">统帅等级</label>
-            <select
-              class="form-select"
-              id="characterSelect"
-              v-model="currentCharacter.commanderLevel"
-            >
-              <option v-for="level in levelOptions" :key="level.value" :value="level.value">
-                {{ level.label }}
-              </option>
-            </select>
+            <div class="input-group">
+              <el-select
+                v-model.number="currentCharacter.commanderLevel"
+                filterable
+                placeholder="Select"
+                style="width: 240px"
+              >
+                <el-option
+                  v-for="item in levelOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+            </div>
           </div>
 
           <div class="row">
@@ -620,37 +642,35 @@ const activeTab = ref('result')
             <div class="col-md-6">
               <div class="mb-3">
                 <label class="form-label">T11进度</label>
-                <select
-                  class="form-select"
-                  id="characterSelect"
-                  v-model="currentCharacter.t11Progress"
+                <el-select
+                  v-model.number="currentCharacter.t11Progress"
+                  filterable
+                  placeholder="Select"
                 >
-                  <option
-                    v-for="option in t11ProgressOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
+                  <el-option
+                    v-for="item in t11ProgressOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
                 <label class="form-label">火晶进度</label>
-                <select
-                  class="form-select"
-                  id="characterSelect"
-                  v-model="currentCharacter.fireCrystalProgress"
+                <el-select
+                  v-model.number="currentCharacter.fireCrystalProgress"
+                  filterable
+                  placeholder="Select"
                 >
-                  <option
-                    v-for="option in fireCrystalProgressOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
+                  <el-option
+                    v-for="item in fireCrystalProgressOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
               </div>
             </div>
           </div>
@@ -750,10 +770,6 @@ const activeTab = ref('result')
                   </div>
                 </div>
               </div>
-
-              <!-- <div class="chart-container mt-4">
-                <canvas ref="costChart"></canvas>
-              </div> -->
             </el-tab-pane>
             <el-tab-pane label="领主装备设置" name="lordEquipment">
               <div class="d-flex justify-content-between align-items-center mb-3">
@@ -787,36 +803,64 @@ const activeTab = ref('result')
                       class="equipment-row"
                     >
                       <td>
-                        <select class="form-select form-select-sm" v-model="item.level">
-                          <option
-                            v-for="lord in baseData.lordEquipment"
-                            :key="lord.level"
-                            :value="lord.level"
-                          >
-                            {{ lord.level }}
-                          </option>
-                        </select>
+                        <el-select
+                          style="width: 110px"
+                          v-model.number="item.level"
+                          filterable
+                          placeholder="Select"
+                        >
+                          <el-option
+                            v-for="item in baseData.lordEquipment"
+                            :key="item.level"
+                            :label="item.level"
+                            :value="item.level"
+                          />
+                        </el-select>
                       </td>
                       <td>
-                        <select class="form-select form-select-sm" v-model="item.gem1">
-                          <option v-for="gem in baseData.gems" :key="gem.level" :value="gem.level">
-                            {{ gem.level }}
-                          </option>
-                        </select>
+                        <el-select
+                          style="width: 80px"
+                          v-model.number="item.gem1"
+                          filterable
+                          placeholder="Select"
+                        >
+                          <el-option
+                            v-for="item in baseData.gems"
+                            :key="item.level"
+                            :label="item.level"
+                            :value="item.level"
+                          />
+                        </el-select>
                       </td>
                       <td>
-                        <select class="form-select form-select-sm" v-model="item.gem2">
-                          <option v-for="gem in baseData.gems" :key="gem.level" :value="gem.level">
-                            {{ gem.level }}
-                          </option>
-                        </select>
+                        <el-select
+                          style="width: 80px"
+                          v-model.number="item.gem2"
+                          filterable
+                          placeholder="Select"
+                        >
+                          <el-option
+                            v-for="item in baseData.gems"
+                            :key="item.level"
+                            :label="item.level"
+                            :value="item.level"
+                          />
+                        </el-select>
                       </td>
                       <td>
-                        <select class="form-select form-select-sm" v-model="item.gem3">
-                          <option v-for="gem in baseData.gems" :key="gem.level" :value="gem.level">
-                            {{ gem.level }}
-                          </option>
-                        </select>
+                        <el-select
+                          style="width: 80px"
+                          v-model.number="item.gem3"
+                          filterable
+                          placeholder="Select"
+                        >
+                          <el-option
+                            v-for="item in baseData.gems"
+                            :key="item.level"
+                            :label="item.level"
+                            :value="item.level"
+                          />
+                        </el-select>
                       </td>
                       <td>
                         {{ getLordEquipmentCost(item.level).toFixed(2) }}
@@ -868,7 +912,20 @@ const activeTab = ref('result')
                       class="equipment-row"
                     >
                       <td>
-                        <select class="form-select form-select-sm" v-model="item.level">
+                        <el-select
+                          style="width: 100px"
+                          v-model.number="item.level"
+                          filterable
+                          placeholder="Select"
+                        >
+                          <el-option
+                            v-for="item in baseData.heroEquipment"
+                            :key="item.level"
+                            :label="item.level"
+                            :value="item.level"
+                          />
+                        </el-select>
+                        <!-- <select class="form-select form-select-sm" v-model="item.level">
                           <option
                             v-for="hero in baseData.heroEquipment"
                             :key="hero.level"
@@ -876,10 +933,23 @@ const activeTab = ref('result')
                           >
                             {{ hero.level }}
                           </option>
-                        </select>
+                        </select> -->
                       </td>
                       <td>
-                        <select class="form-select form-select-sm" v-model.number="item.mastery">
+                        <el-select
+                          style="width: 80px"
+                          v-model.number="item.mastery"
+                          filterable
+                          placeholder="Select"
+                        >
+                          <el-option
+                            v-for="item in baseData.mastery"
+                            :key="item.level"
+                            :label="item.level"
+                            :value="item.level"
+                          />
+                        </el-select>
+                        <!-- <select class="form-select form-select-sm" v-model.number="item.mastery">
                           <option
                             v-for="mastery in baseData.mastery"
                             :key="mastery.level"
@@ -887,7 +957,7 @@ const activeTab = ref('result')
                           >
                             {{ mastery.level }}
                           </option>
-                        </select>
+                        </select> -->
                       </td>
                       <td>
                         {{ getHeroEquipmentCost(item.level).toFixed(2) }}
@@ -916,6 +986,15 @@ const activeTab = ref('result')
             <!-- <el-tab-pane label="Task" name="fourth">Task</el-tab-pane> -->
           </el-tabs>
         </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card">
+        <el-table :data="characters" border style="width: 100%">
+          <el-table-column prop="date" label="Date" width="180" />
+          <el-table-column prop="name" label="Name" width="180" />
+          <el-table-column prop="address" label="Address" />
+        </el-table>
       </div>
     </div>
     <el-dialog v-model="showAddCharacterModal" on title="添加新角色">
